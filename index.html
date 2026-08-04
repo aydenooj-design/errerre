@@ -31,23 +31,10 @@ body {
 
   /* scroll bar outside menu on left */
   .scroll-rail {
-       position: fixed;
-    left: 14px;
-    top: 14px;
-    bottom: 14px;
-    width: 8px;
-    background: rgba(255,255,255,.05);
-    border-radius: 4px;
     z-index: 20;
     pointer-events: none;
   }
   .scroll-rail::after {
-    content: "";
-    position: absolute;
-    left: 2px; right: 2px;
-    top: 30%; height: 40%;
-    background: var(--accent);
-    border-radius: 4px;
     opacity: .7;
   }
 
