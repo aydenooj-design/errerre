@@ -1,0 +1,732 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Phantom</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --ui-font: Arial, Helvetica, sans-serif;
+    --ui-scale: 1;
+    --panel-w: 430px;
+    --item-h: 34px;
+    --accent: #3d9fd4;
+    --accent-dim: #1e6aa3;
+    --pos-x: 0px;
+    --pos-y: 0px;
+  }
+
+  body {
+    min-height: 100vh;
+    display: flex;
+    align-items: flex-start;
+    justify-content: flex-start;
+    background: #1a1a1a;
+    font-family: var(--ui-font);
+    overflow: hidden;
+  }
+
+  /* scroll bar outside menu on left */
+  .scroll-rail {
+    position: fixed;
+    left: 14px;
+    top: 14px;
+    bottom: 14px;
+    width: 8px;
+    background: rgba(255,255,255,.05);
+    border-radius: 4px;
+    z-index: 20;
+    pointer-events: none;
+  }
+  .scroll-rail::after {
+    content: "";
+    position: absolute;
+    left: 2px; right: 2px;
+    top: 30%; height: 40%;
+    background: var(--accent);
+    border-radius: 4px;
+    opacity: .7;
+  }
+
+  .panel {
+    margin-left: 32px;
+    margin-top: 20px;
+    width: calc(var(--panel-w) * var(--ui-scale));
+    border-radius: 4px;
+    overflow: hidden;
+    box-shadow: 0 18px 50px rgba(0,0,0,.65);
+    background: #0a0a0a;
+    transform: translate(var(--pos-x), var(--pos-y));
+  }
+
+  /* ===== HEADER ===== */
+  .header {
+    height: calc(110px * var(--ui-scale));
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(160deg, #3d86b8 0%, #2a6a98 40%, #1a4d75 100%);
+    overflow: hidden;
+  }
+
+  .header::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at 35% 40%, rgba(255,255,255,.18), transparent 55%);
+    pointer-events: none;
+  }
+
+  .logo { position: relative; z-index: 2; filter: drop-shadow(0 4px 6px rgba(0,0,0,.45)); }
+
+  /* ===== TABS ===== */
+  .tab-row {
+    min-height: calc(26px * var(--ui-scale));
+    background: #050505;
+    display: flex;
+    align-items: stretch;
+  }
+
+  .tab {
+    display: flex; align-items: center; justify-content: center;
+    padding: 0 calc(14px * var(--ui-scale));
+    font-size: calc(11.5px * var(--ui-scale)); font-weight: 700;
+    color: #8b939c; background: transparent;
+    letter-spacing: .2px; white-space: nowrap;
+    border-bottom: 2px solid transparent; cursor: default;
+  }
+  .tab.active { color: #fff; background: var(--accent-dim); border-bottom-color: var(--accent); }
+
+  /* ===== LIST ===== */
+  .list-wrap { position: relative; background: #0d0d0d; padding: 0; }
+  .list { position: relative; z-index: 1; }
+
+  .item {
+    height: calc(var(--item-h) * var(--ui-scale));
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 calc(14px * var(--ui-scale)) 0 calc(12px * var(--ui-scale));
+    font-size: calc(13.5px * var(--ui-scale)); color: #c8cdd3;
+    position: relative; cursor: default; background: transparent;
+  }
+
+  .item .label { position: relative; z-index: 2; text-shadow: 0 1px 2px rgba(0,0,0,.8); }
+  .item .right { position: relative; z-index: 2; display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+  .item .chev { font-size: calc(15px * var(--ui-scale)); color: #6b7280; font-weight: 600; }
+  .item .value-text { font-size: calc(12.5px * var(--ui-scale)); color: #9aa3ad; text-shadow: 0 1px 2px rgba(0,0,0,.8); }
+
+  .item.active { color: #fff; }
+  .item.active .label, .item.active .chev, .item.active .value-text { color: #fff; }
+
+  /* selection highlight — small rounding, full width inside list */
+  .sel {
+    position: absolute; left: 0; right: 0;
+    height: calc(var(--item-h) * var(--ui-scale));
+    top: 0; z-index: 0; pointer-events: none; will-change: transform;
+    border-radius: 3px;
+    background: linear-gradient(180deg, #4a9fd6 0%, #2f7eb8 55%, #286ea3 100%);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.28), inset 0 -1px 0 rgba(0,0,0,.2);
+  }
+  .sel::after {
+    content: ""; position: absolute; left: 0; right: 0; top: 0; height: 48%;
+    border-radius: 3px 3px 0 0;
+    background: linear-gradient(180deg, rgba(255,255,255,.16), transparent);
+  }
+
+  /* smaller pill toggle */
+  .toggle {
+    width: calc(36px * var(--ui-scale)); height: calc(18px * var(--ui-scale));
+    border-radius: 999px; position: relative; background: #22262b;
+    border: 1px solid #0a0a0a; box-shadow: inset 0 1px 3px rgba(0,0,0,.55);
+    flex-shrink: 0; overflow: hidden;
+  }
+  .toggle-fill { position: absolute; inset: 0; border-radius: inherit;
+    background: linear-gradient(180deg, #6ec8f2 0%, #3596d4 50%, #2178b4 100%);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.3); opacity: 0; }
+  .toggle-knob { position: absolute; top: 1px; left: 1px;
+    width: calc(14px * var(--ui-scale)); height: calc(14px * var(--ui-scale));
+    border-radius: 50%; background: linear-gradient(180deg, #fff 0%, #e4e9ee 60%, #c8d0d8 100%);
+    box-shadow: 0 1px 3px rgba(0,0,0,.45), inset 0 1px 0 #fff; will-change: transform; }
+
+  /* ===== FOOTER ===== */
+  .footer {
+    height: calc(28px * var(--ui-scale));
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 calc(14px * var(--ui-scale));
+    font-size: calc(12px * var(--ui-scale)); font-weight: 700; color: #dde2e7;
+    background: #0f0f0f; border-top: 1px solid #1a1a1a;
+  }
+
+  /* stacking toasts */
+  .toasts {
+    position: fixed; top: 18px; left: 50%; transform: translateX(-50%);
+    display: flex; flex-direction: column; align-items: center; gap: 8px;
+    z-index: 100; pointer-events: none; width: max-content; max-width: 90vw;
+  }
+  .toast {
+    background: rgba(10,10,10,.94); color: #fff; padding: 9px 18px; border-radius: 4px;
+    font-size: 13px; font-family: var(--ui-font); border: 1px solid #333;
+    opacity: 0; transform: translateY(-8px);
+    transition: opacity .18s ease, transform .18s ease;
+    box-shadow: 0 8px 20px rgba(0,0,0,.35); white-space: nowrap;
+  }
+  .toast.show { opacity: 1; transform: translateY(0); }
+  .toast.hide { opacity: 0; transform: translateY(-6px); }
+</style>
+</head>
+<body>
+
+<div class="scroll-rail" aria-hidden="true"></div>
+
+<div class="toasts" id="toasts"></div>
+
+<div class="panel" id="panel">
+  <div class="header">
+    <div class="logo" aria-label="Phantom">
+      <svg width="340" height="82" viewBox="0 0 350 86" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="chrome" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#ffffff"/>
+            <stop offset="22%" stop-color="#eef2f5"/>
+            <stop offset="40%" stop-color="#a8b0b8"/>
+            <stop offset="50%" stop-color="#5c6570"/>
+            <stop offset="62%" stop-color="#c8d0d7"/>
+            <stop offset="80%" stop-color="#f5f8fb"/>
+            <stop offset="100%" stop-color="#9099a2"/>
+          </linearGradient>
+          <linearGradient id="chromeEdge" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#e6ebef"/>
+            <stop offset="50%" stop-color="#3a424a"/>
+            <stop offset="100%" stop-color="#c2cad2"/>
+          </linearGradient>
+          <filter id="soft" x="-15%" y="-15%" width="130%" height="140%">
+            <feDropShadow dx="0" dy="1.5" stdDeviation="0.8" flood-color="#000" flood-opacity=".5"/>
+          </filter>
+        </defs>
+        <g filter="url(#soft)">
+          <path d="M12 14 C12 9, 16 5, 22 5 L48 5 C72 5, 88 18, 88 36 C88 54, 72 65, 50 65 L34 65 L34 80 L18 80 C14 80, 12 77, 12 73 Z"
+                fill="url(#chromeEdge)" stroke="#2a3138" stroke-width="1.1"/>
+          <rect x="22" y="16" width="11" height="58" rx="2" fill="url(#chrome)"/>
+          <path d="M33 18 H52 C70 18, 80 25, 80 37 C80 49, 70 56, 52 56 H33 Z
+                   M44 28 V46 H51 C59 46, 65 43, 65 37 C65 31, 59 28, 51 28 Z"
+                fill="url(#chrome)"/>
+        </g>
+        <g filter="url(#soft)">
+          <text x="102" y="60"
+                font-family="Georgia, 'Times New Roman', serif"
+                font-size="50"
+                font-style="italic"
+                font-weight="700"
+                fill="url(#chrome)"
+                stroke="#333a42" stroke-width="1.1"
+                paint-order="stroke fill">Phantom</text>
+        </g>
+      </svg>
+    </div>
+  </div>
+
+  <div class="tab-row" id="tabRow"></div>
+
+  <div class="list-wrap">
+    <div class="sel" id="sel"></div>
+    <div class="list" id="list"></div>
+  </div>
+
+  <div class="footer">
+    <span id="footName">Phantom</span>
+    <span id="count">1/9</span>
+  </div>
+</div>
+
+<script>
+const BASE_ITEM_H = 34;
+const SEL_LERP = 0.2;
+const TOGGLE_LERP = 0.22;
+
+const FONTS = [
+  { name: "Arial", stack: "Arial, Helvetica, sans-serif" },
+  { name: "Tahoma", stack: "Tahoma, Verdana, sans-serif" },
+  { name: "Verdana", stack: "Verdana, Geneva, sans-serif" },
+  { name: "Trebuchet MS", stack: "'Trebuchet MS', Tahoma, sans-serif" },
+  { name: "Georgia", stack: "Georgia, 'Times New Roman', serif" },
+  { name: "Times New Roman", stack: "'Times New Roman', Times, serif" },
+  { name: "Courier New", stack: "'Courier New', Courier, monospace" },
+  { name: "Segoe UI", stack: "'Segoe UI', Tahoma, sans-serif" },
+  { name: "Comic Sans MS", stack: "'Comic Sans MS', cursive" },
+  { name: "Impact", stack: "Impact, Haettenschweiler, sans-serif" }
+];
+
+const DPI_STEPS = [75, 85, 100, 110, 125, 140, 150, 175, 200];
+
+const state = {
+  fontIndex: 0, dpiIndex: 2,
+  godMode: false, invisibility: true, infiniteStamina: false,
+  crosshair: true, streamerMode: false, notifications: true,
+  infAmmo: false, godVeh: false, esp: false, fullbright: false, resmon: false,
+  outfitGlow: false, randomClothes: false, noHelmet: true, maskHidden: false,
+  positionMode: false
+};
+
+const sections = {
+  main: { footer: "Phantom", tabs: [{id:"main",label:"Main"}] },
+  player: { footer: "Player", tabs: [{id:"player",label:"Player"},{id:"appearance",label:"Appearance"}] },
+  server: { footer: "Server", tabs: [{id:"server",label:"Server"}] },
+  weapon: { footer: "Weapon", tabs: [{id:"weapon",label:"Weapon"}] },
+  vehicle: { footer: "Vehicle", tabs: [{id:"vehicle",label:"Vehicle"}] },
+  teleports: { footer: "Teleports", tabs: [{id:"teleports",label:"Teleports"}] },
+  visual: { footer: "Visual", tabs: [{id:"visual",label:"Visual"}] },
+  outfit: { footer: "Outfit", tabs: [{id:"outfit",label:"Outfit"}] },
+  resources: { footer: "Resources", tabs: [{id:"resources",label:"Resources"}] },
+  settings: { footer: "Settings", tabs: [{id:"settings",label:"Settings"}] }
+};
+
+const pageSection = {
+  main:"main", player:"player", appearance:"player", server:"server",
+  weapon:"weapon", vehicle:"vehicle", teleports:"teleports", visual:"visual",
+  outfit:"outfit", resources:"resources", settings:"settings"
+};
+
+const pages = {
+  main: [
+    { type:"link", label:"Player", page:"player" },
+    { type:"link", label:"Server", page:"server" },
+    { type:"link", label:"Weapon", page:"weapon" },
+    { type:"link", label:"Vehicle", page:"vehicle" },
+    { type:"link", label:"Teleports", page:"teleports" },
+    { type:"link", label:"Visual", page:"visual" },
+    { type:"link", label:"Outfit", page:"outfit" },
+    { type:"link", label:"Resources", page:"resources" },
+    { type:"link", label:"Settings", page:"settings" }
+  ],
+  player: [
+    { type:"toggle", label:"God Mode", key:"godMode" },
+    { type:"toggle", label:"Invisibility", key:"invisibility" },
+    { type:"toggle", label:"Infinite Stamina", key:"infiniteStamina" },
+    { type:"action", label:"Heal Player" },
+    { type:"action", label:"Suicide" }
+  ],
+  appearance: [
+    { type:"toggle", label:"Outfit Glow", key:"outfitGlow" },
+    { type:"toggle", label:"Hide Mask", key:"maskHidden" },
+    { type:"toggle", label:"No Helmet", key:"noHelmet" },
+    { type:"action", label:"Random Clothes" },
+    { type:"action", label:"Reset Appearance" }
+  ],
+  server: [
+    { type:"action", label:"Copy Server IP" },
+    { type:"action", label:"Reconnect" },
+    { type:"toggle", label:"Streamer Mode", key:"streamerMode" }
+  ],
+  weapon: [
+    { type:"action", label:"Give All Weapons" },
+    { type:"action", label:"Remove Weapons" },
+    { type:"toggle", label:"Infinite Ammo", key:"infAmmo" }
+  ],
+  vehicle: [
+    { type:"action", label:"Repair Vehicle" },
+    { type:"action", label:"Flip Vehicle" },
+    { type:"toggle", label:"God Vehicle", key:"godVeh" }
+  ],
+  teleports: [
+    { type:"action", label:"Waypoint" },
+    { type:"action", label:"Closest Vehicle" },
+    { type:"action", label:"Save Position" },
+    { type:"action", label:"Load Position" }
+  ],
+  visual: [
+    { type:"toggle", label:"Crosshair", key:"crosshair" },
+    { type:"toggle", label:"Player ESP", key:"esp" },
+    { type:"toggle", label:"Fullbright", key:"fullbright" }
+  ],
+  outfit: [
+    { type:"action", label:"Random Outfit" },
+    { type:"action", label:"Save Outfit" },
+    { type:"action", label:"Load Outfit" }
+  ],
+  resources: [
+    { type:"action", label:"Stop All Resources" },
+    { type:"action", label:"Reload Resources" },
+    { type:"toggle", label:"Resource Monitor", key:"resmon" }
+  ],
+  settings: [
+    { type:"font", label:"Font" },
+    { type:"dpi", label:"DPI Scale" },
+    { type:"toggle", label:"Position Mode", key:"positionMode" },
+    { type:"toggle", label:"Notifications", key:"notifications" },
+    { type:"action", label:"Reset Settings" }
+  ]
+};
+
+/* =========================================================
+   FiveM DUI / NUI BRIDGE
+   - JS -> Lua : POST to https://<resourceName>/<callback>
+                 (works with RegisterNUICallback in the client)
+   - Lua -> JS : SendDUIMessage(dui, json.encode({...}))
+                 arrives here via window 'message' event
+   ========================================================= */
+const RESOURCE_NAME =
+  (typeof GetParentResourceName === "function" && GetParentResourceName()) ||
+  "phantom";
+
+// Send an event to the Lua side. Fails silently in a browser.
+function post(name, data = {}) {
+  try {
+    fetch(`https://${RESOURCE_NAME}/${name}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json; charset=UTF-8" },
+      body: JSON.stringify(data)
+    }).catch(() => {});
+  } catch (err) { /* not in CEF */ }
+}
+
+const listEl = document.getElementById("list");
+const selEl = document.getElementById("sel");
+const countEl = document.getElementById("count");
+const tabRow = document.getElementById("tabRow");
+const footName = document.getElementById("footName");
+const toastsEl = document.getElementById("toasts");
+
+let pageId = "main";
+let sectionId = "main";
+let target = 0;
+let currentY = 0;
+let displayIndex = 0;
+let rows = [];
+let pageItems = [];
+const toggleAnim = {};
+
+function getToggle(key) { return !!state[key]; }
+function setToggle(key, val) { state[key] = val; if (!toggleAnim[key]) toggleAnim[key] = { t: val ? 1 : 0 }; }
+
+function itemH() { return BASE_ITEM_H * (DPI_STEPS[state.dpiIndex] / 100); }
+function toggleTravel() { return 20 * (DPI_STEPS[state.dpiIndex] / 100); }
+
+function toast(msg) {
+  if (!state.notifications && !String(msg).startsWith("Font") && !String(msg).startsWith("DPI") && msg !== "Notifications: ON") return;
+  const el = document.createElement("div");
+  el.className = "toast"; el.textContent = msg; toastsEl.appendChild(el);
+  requestAnimationFrame(() => el.classList.add("show"));
+  setTimeout(() => { el.classList.remove("show"); el.classList.add("hide"); setTimeout(() => el.remove(), 200); }, 1600);
+}
+
+function applyFont() {
+  const f = FONTS[state.fontIndex];
+  document.documentElement.style.setProperty("--ui-font", f.stack);
+  document.body.style.fontFamily = f.stack;
+}
+function applyDpi() {
+  const s = DPI_STEPS[state.dpiIndex] / 100;
+  document.documentElement.style.setProperty("--ui-scale", String(s));
+}
+function applyPos() {
+  document.documentElement.style.setProperty("--pos-x", state.posX + "px");
+  document.documentElement.style.setProperty("--pos-y", state.posY + "px");
+}
+
+state.posX = 0; state.posY = 0;
+
+function renderTabs() {
+  const sec = sections[sectionId];
+  tabRow.innerHTML = "";
+  sec.tabs.forEach(t => {
+    const el = document.createElement("div");
+    el.className = "tab" + (t.id === pageId ? " active" : "");
+    el.textContent = t.label;
+    el.addEventListener("click", () => { if (t.id !== pageId) buildPage(t.id, 0); });
+    tabRow.appendChild(el);
+  });
+}
+
+function buildPage(id, startIndex = 0, resetTarget = true) {
+  pageId = id;
+  sectionId = pageSection[id] || "main";
+  pageItems = pages[id] || [];
+  footName.textContent = sections[sectionId].footer;
+  renderTabs();
+
+  listEl.innerHTML = "";
+  pageItems.forEach((item, i) => {
+    const row = document.createElement("div");
+    row.className = "item";
+
+    const lbl = document.createElement("span"); lbl.className = "label"; lbl.textContent = item.label;
+
+    const right = document.createElement("div"); right.className = "right";
+
+    if (item.type === "link") right.innerHTML = '<span class="chev">›</span>';
+    else if (item.type === "action") right.innerHTML = "";
+    else if (item.type === "toggle") {
+      const on = getToggle(item.key);
+      if (!toggleAnim[item.key]) toggleAnim[item.key] = { t: on ? 1 : 0 };
+      const tgl = document.createElement("div"); tgl.className = "toggle"; tgl.dataset.key = item.key;
+      tgl.innerHTML = '<div class="toggle-fill"></div><div class="toggle-knob"></div>';
+      right.appendChild(tgl);
+    } else if (item.type === "font") {
+      const v = document.createElement("span"); v.className = "value-text fname";
+      v.textContent = "-" + FONTS[state.fontIndex].name + "-";
+      right.appendChild(v);
+    } else if (item.type === "dpi") {
+      const v = document.createElement("span"); v.className = "value-text dpiname";
+      v.textContent = "-" + DPI_STEPS[state.dpiIndex] + "%-";
+      right.appendChild(v);
+    }
+
+    row.appendChild(lbl); row.appendChild(right);
+    row.addEventListener("mouseenter", () => { target = i; updateCount(); });
+    row.addEventListener("click", () => { target = i; updateCount(); activate(); });
+    listEl.appendChild(row);
+  });
+
+  rows = [...listEl.children];
+  if (resetTarget) target = Math.max(0, Math.min(pageItems.length - 1, startIndex));
+  else target = Math.max(0, Math.min(pageItems.length - 1, target));
+  displayIndex = target;
+  rows.forEach((r, i) => r.classList.toggle("active", i === target));
+  currentY = target * itemH();
+  selEl.style.height = itemH() + "px";
+  selEl.style.transform = `translateY(${currentY}px)`;
+  updateCount();
+  paintToggles();
+  paintValueLabels();
+}
+
+function updateCount() { countEl.textContent = (pageItems.length ? target + 1 : 0) + "/" + pageItems.length; }
+function paintValueLabels() {
+  const f = listEl.querySelector(".fname"); if (f) f.textContent = "-" + FONTS[state.fontIndex].name + "-";
+  const d = listEl.querySelector(".dpiname"); if (d) d.textContent = "-" + DPI_STEPS[state.dpiIndex] + "%-";
+}
+function paintToggles() {
+  const travel = toggleTravel();
+  listEl.querySelectorAll(".toggle").forEach(el => {
+    const key = el.dataset.key; if (!toggleAnim[key]) toggleAnim[key] = { t: getToggle(key) ? 1 : 0 };
+    const t = toggleAnim[key].t;
+    el.querySelector(".toggle-fill").style.opacity = t;
+    el.querySelector(".toggle-knob").style.transform = `translateX(${t * travel}px)`;
+  });
+}
+
+function activate() {
+  const item = pageItems[target]; if (!item) return;
+  if (item.type === "link") {
+    buildPage(item.page, 0);
+    post("navigate", { page: item.page, from: "select" });
+  }
+  else if (item.type === "toggle") {
+    const n = !getToggle(item.key); setToggle(item.key, n); toast(item.label + ": " + (n ? "ON" : "OFF"));
+    post("toggle", { key: item.key, label: item.label, value: n, page: pageId });
+  }
+  else if (item.type === "action") {
+    if (item.label === "Reset Settings") {
+      state.fontIndex = 0; state.dpiIndex = 2; state.notifications = true; state.posX = 0; state.posY = 0; applyFont(); applyDpi(); applyPos(); buildPage(pageId, target); toast("Settings reset");
+      post("resetSettings", {});
+    } else {
+      toast(item.label);
+    }
+    post("action", { action: item.action || item.label, label: item.label, page: pageId, index: target });
+  } else if (item.type === "font") {
+    toast("Font: " + FONTS[state.fontIndex].name);
+    post("select", { type: "font", value: FONTS[state.fontIndex].name });
+  }
+  else if (item.type === "dpi") {
+    toast("DPI: " + DPI_STEPS[state.dpiIndex] + "%");
+    post("select", { type: "dpi", value: DPI_STEPS[state.dpiIndex] });
+  }
+}
+
+function changeValue(dir) {
+  const item = pageItems[target]; if (!item) return;
+  if (item.type === "font") {
+    state.fontIndex = (state.fontIndex + dir + FONTS.length) % FONTS.length; applyFont(); paintValueLabels(); toast("Font: " + FONTS[state.fontIndex].name);
+    post("changeValue", { key: "font", label: "Font", value: FONTS[state.fontIndex].name, index: state.fontIndex, page: pageId });
+  }
+  else if (item.type === "dpi") {
+    const next = state.dpiIndex + dir; if (next < 0 || next >= DPI_STEPS.length) return; state.dpiIndex = next; applyDpi(); const k = target; buildPage(pageId, k); toast("DPI: " + DPI_STEPS[state.dpiIndex] + "%");
+    post("changeValue", { key: "dpi", label: "DPI Scale", value: DPI_STEPS[state.dpiIndex], index: state.dpiIndex, page: pageId });
+  }
+  else if (item.type === "toggle") {
+    const n = dir > 0; if (getToggle(item.key) !== n) { setToggle(item.key, n); toast(item.label + ": " + (n ? "ON" : "OFF"));
+    post("toggle", { key: item.key, label: item.label, value: n, page: pageId }); }
+  }
+}
+
+function emitScroll(dir) {
+  const item = pageItems[target] || {};
+  post("scroll", {
+    direction: dir,          // "up" | "down"
+    index: target,           // 0-based
+    total: pageItems.length,
+    label: item.label || "",
+    page: pageId
+  });
+}
+
+function switchTab(dir) {
+  const tabs = sections[sectionId].tabs;
+  if (tabs.length <= 1) return;
+  const idx = tabs.findIndex(t => t.id === pageId);
+  const next = (idx + dir + tabs.length) % tabs.length;
+  if (tabs[next].id !== pageId) {
+    buildPage(tabs[next].id, 0);
+    post("tab", { tab: tabs[next].id, label: tabs[next].label, direction: dir > 0 ? "next" : "prev" });
+  }
+}
+
+function goBack() {
+  if (sectionId === "main") return;
+  const idx = pages.main.findIndex(x => x.page === sectionId);
+  buildPage("main", idx < 0 ? 0 : idx);
+  post("back", { page: "main" });
+}
+
+function tick() {
+  const h = itemH();
+  const goal = target * h;
+  currentY += (goal - currentY) * SEL_LERP;
+  if (Math.abs(goal - currentY) < 0.1) currentY = goal;
+  selEl.style.height = h + "px";
+  selEl.style.transform = `translateY(${currentY}px)`;
+
+  const nearest = Math.round(currentY / h);
+  if (nearest !== displayIndex && rows[nearest]) {
+    if (rows[displayIndex]) rows[displayIndex].classList.remove("active");
+    displayIndex = Math.max(0, Math.min(rows.length - 1, nearest));
+    rows[displayIndex].classList.add("active");
+  }
+
+  for (const key of Object.keys(toggleAnim)) {
+    const goalT = getToggle(key) ? 1 : 0;
+    const a = toggleAnim[key];
+    const diff = goalT - a.t; if (Math.abs(diff) > 0.001) a.t += diff * TOGGLE_LERP; else a.t = goalT;
+  }
+  paintToggles();
+  requestAnimationFrame(tick);
+}
+
+document.addEventListener("keydown", (e) => {
+  const key = e.key;
+  const lower = key.toLowerCase();
+  const n = pageItems.length;
+
+  // Position Mode: arrow keys pan the menu instead of selecting
+  if (state.positionMode) {
+    if (key === "ArrowUp") { state.posY -= 20; applyPos(); post("move", { x: state.posX, y: state.posY, dir: "up" }); e.preventDefault(); return; }
+    if (key === "ArrowDown") { state.posY += 20; applyPos(); post("move", { x: state.posX, y: state.posY, dir: "down" }); e.preventDefault(); return; }
+    if (key === "ArrowLeft") { state.posX -= 20; applyPos(); post("move", { x: state.posX, y: state.posY, dir: "left" }); e.preventDefault(); return; }
+    if (key === "ArrowRight") { state.posX += 20; applyPos(); post("move", { x: state.posX, y: state.posY, dir: "right" }); e.preventDefault(); return; }
+  }
+
+  if (key === "ArrowDown") { e.preventDefault(); if (!n) return; target = (target + 1) % n; updateCount(); emitScroll("down"); }
+  else if (key === "ArrowUp") { e.preventDefault(); if (!n) return; target = (target - 1 + n) % n; updateCount(); emitScroll("up"); }
+  else if (key === "ArrowRight") { e.preventDefault(); changeValue(1); }
+  else if (key === "ArrowLeft") { e.preventDefault(); changeValue(-1); }
+  else if (lower === "e") { e.preventDefault(); switchTab(1); }
+  else if (lower === "q") { e.preventDefault(); switchTab(-1); }
+  else if (key === "Enter") { e.preventDefault(); activate(); }
+  else if (key === "Backspace" || key === "Escape") { e.preventDefault(); goBack(); }
+});
+
+/* =========================================================
+   INCOMING: Lua -> JS via SendDUIMessage(dui, json.encode(...))
+   The payload should include an "action" field, e.g.
+     SendDUIMessage(dui, json.encode({ action = "open" }))
+     SendDUIMessage(dui, json.encode({ action = "scroll", direction = "down" }))
+     SendDUIMessage(dui, json.encode({ action = "select" }))
+     SendDUIMessage(dui, json.encode({ action = "setToggle", key = "godMode", value = true }))
+   ========================================================= */
+window.addEventListener("message", (event) => {
+  const data = event.data || {};
+  const action = data.action || data.type;
+  if (!action) return;
+
+  switch (action) {
+    case "open":
+    case "show":
+      document.body.style.display = "";
+      if (data.page) buildPage(data.page, 0);
+      post("opened", {});
+      break;
+
+    case "close":
+    case "hide":
+      post("closed", {});
+      break;
+
+    case "scroll": {
+      const n = pageItems.length;
+      if (!n) break;
+      if (data.direction === "up") { target = (target - 1 + n) % n; emitScroll("up"); }
+      else { target = (target + 1) % n; emitScroll("down"); }
+      updateCount();
+      break;
+    }
+
+    case "select":
+    case "enter":
+      activate();
+      break;
+
+    case "back":
+      goBack();
+      break;
+
+    case "left":
+      changeValue(-1);
+      break;
+
+    case "right":
+      changeValue(1);
+      break;
+
+    case "tabNext":
+      switchTab(1);
+      break;
+
+    case "tabPrev":
+      switchTab(-1);
+      break;
+
+    case "navigate":
+      if (data.page) buildPage(data.page, 0);
+      break;
+
+    case "setToggle":
+      if (data.key !== undefined) {
+        setToggle(data.key, !!data.value);
+        if (pages[pageId]?.some(it => it.key === data.key)) buildPage(pageId, target);
+      }
+      break;
+
+    case "setFont":
+      if (typeof data.index === "number" && FONTS[data.index]) {
+        state.fontIndex = data.index; applyFont(); paintValueLabels();
+      }
+      break;
+
+    case "setDpi":
+      if (typeof data.index === "number" && DPI_STEPS[data.index] !== undefined) {
+        state.dpiIndex = data.index; applyDpi(); buildPage(pageId, target);
+      }
+      break;
+
+    case "setPosition":
+      if (typeof data.x === "number") state.posX = data.x;
+      if (typeof data.y === "number") state.posY = data.y;
+      applyPos();
+      break;
+
+    default:
+      break;
+  }
+});
+
+applyFont(); applyDpi(); applyPos();
+buildPage("main", 7);
+requestAnimationFrame(tick);
+
+// tell Lua the DUI page is ready
+post("ready", { resource: RESOURCE_NAME });
+</script>
+</body>
+</html>
